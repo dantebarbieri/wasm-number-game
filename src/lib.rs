@@ -1,19 +1,13 @@
 mod utils;
 
-use wasm_bindgen::prelude::*;
 use rand::rngs::OsRng;
 use rand::Rng;
+use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
-extern "C" {
-    fn alert(s: &str);
-}
-
-#[wasm_bindgen]
-pub fn greet() {
+pub fn next(lo: u32, hi: u32) -> u32 {
     let mut rng = OsRng; // Using OsRng for high-quality entropy
     let random_number: u32 = rng.gen(); // Generate a random u32 number
 
-    let greeting = format!("Hello, wasm-number-game! Your random number is: {}", random_number);
-    alert(&greeting);
+    random_number % (hi - lo) + lo
 }
