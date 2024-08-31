@@ -145,7 +145,7 @@ impl Game {
             let t = t.unwrap_or(self.slots.len());
 
             for (i, slot) in self.slots.iter_mut().enumerate() {
-                slot.enabled = s < t && s <= i && i <= t;
+                slot.enabled = s <= t && s <= i && i < t;
             }
         }
     }
