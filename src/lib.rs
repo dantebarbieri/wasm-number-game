@@ -207,6 +207,10 @@ impl Game {
             for (i, slot) in self.slots.iter_mut().enumerate() {
                 slot.enabled = s <= t && s <= i && i < t;
             }
+        } else {
+            for slot in self.slots.iter_mut() {
+                slot.enabled = false;
+            }
         }
     }
 }
