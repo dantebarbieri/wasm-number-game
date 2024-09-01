@@ -24,6 +24,8 @@ pub struct Slot {
 pub struct Game {
     slots: Vec<Slot>,
     pool: Vec<u32>,
+    min: u32,
+    max: u32,
 }
 
 fn create_pool(count: usize, lo: u32, hi: u32) -> Vec<u32> {
@@ -71,6 +73,8 @@ impl Game {
         Game {
             slots,
             pool: create_pool(count, lo, hi),
+            min: lo,
+            max: hi,
         }
     }
 
@@ -78,6 +82,36 @@ impl Game {
         self.place(idx).unwrap();
 
         self.update_enabled();
+    }
+
+    pub fn hint(&self) -> Option<usize> {
+        let slots = self.num_available();
+        if slots == 0 {
+            return None;
+        }
+
+        match self.limit_vals() {
+            Some((a, b)) => {
+                let range = (1 + b - a) as f64;
+                let bucket_size = range / slots as f64;
+                let next = self.next().unwrap() as f64;
+
+                let i = (0..slots)
+                    .take_while(|&i| next > (a as f64 + ((i + 1) as f64 * bucket_size)))
+                    .count();
+
+                let s = self.limits().unwrap().0;
+
+                Some(s + i)
+            }
+            None => None,
+        }
+    }
+
+    pub fn tick(&mut self) {
+        if let Some(idx) = self.hint() {
+            self.step(idx);
+        }
     }
 
     pub fn slot(&self, idx: usize) -> Slot {
@@ -121,29 +155,55 @@ impl Game {
         }
     }
 
-    fn update_enabled(&mut self) {
-        let end_pool = self.pool.last();
-        if let Some(next_output) = end_pool.copied() {
-            let mut s: Option<usize> = None;
-            let mut t: Option<usize> = None;
+    fn limits(&self) -> Option<(usize, usize)> {
+        match self.pool.last().copied() {
+            Some(next_output) => {
+                let mut s: Option<usize> = None;
+                let mut t: Option<usize> = None;
 
-            for (i, slot) in self.slots.iter().enumerate() {
-                if let Some(slot_value) = slot.value {
-                    // Update `s` if the current slot's value is less than `next_output`
-                    if slot_value < next_output {
-                        s = Some(i + 1);
-                    }
+                for (i, slot) in self.slots.iter().enumerate() {
+                    if let Some(slot_value) = slot.value {
+                        // Update `s` if the current slot's value is less than `next_output`
+                        if slot_value < next_output {
+                            s = Some(i + 1);
+                        }
 
-                    // Set `t` if `t` is None and the current slot's value is greater than `next_output`
-                    if t.is_none() && slot_value > next_output {
-                        t = Some(i);
+                        // Set `t` if `t` is None and the current slot's value is greater than `next_output`
+                        if t.is_none() && slot_value > next_output {
+                            t = Some(i);
+                        }
                     }
                 }
+
+                let s = s.unwrap_or(0);
+                let t = t.unwrap_or(self.slots.len());
+                Some((s, t))
             }
+            None => None,
+        }
+    }
 
-            let s = s.unwrap_or(0);
-            let t = t.unwrap_or(self.slots.len());
+    fn limit_vals(&self) -> Option<(u32, u32)> {
+        match self.limits() {
+            Some((s, t)) => {
+                let a = if s == 0 {
+                    self.min
+                } else {
+                    self.slots[s - 1].value.unwrap_or(self.min)
+                };
+                let b = if t == self.slots.len() {
+                    self.max
+                } else {
+                    self.slots[t].value.unwrap_or(self.max)
+                };
+                Some((a, b))
+            }
+            None => None,
+        }
+    }
 
+    fn update_enabled(&mut self) {
+        if let Some((s, t)) = self.limits() {
             for (i, slot) in self.slots.iter_mut().enumerate() {
                 slot.enabled = s <= t && s <= i && i < t;
             }
